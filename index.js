@@ -8,12 +8,11 @@ const client = new Discord.Client({intents: intents , ws: {
         $browser: "$iOS"
     }
 }})
-client.on("rateLimit" , (d) =>{
-    console.log(`Global : ${d.global}, Limit : ${d.limit} , Method : ${d.method} , Path : ${d.path} , Route : ${d.route} , Timeout : ${d.timeout}`)
-})
+
 client.on("ready" , () =>{
     console.log("Ready")
 })
+
 client.on("messageCreate" , (message , msg ,s) =>{
     const serverQueue = queue.get(message.guild.id);
     const prefix = "lfi!"
