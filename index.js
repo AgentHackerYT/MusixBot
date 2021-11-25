@@ -36,9 +36,5 @@ client.on("messageCreate" , (message , msg ,s) =>{
         if(!message.member.voice.channel ) return message.channel.send({content: "Join A Voice Channel"});
         music.Disconnect(message.guild)
     }
-    if(command === "ping"){
-        message.channel.send({content: client.ws.ping})
-
-    }
 })
 client.login(TOKEN)
