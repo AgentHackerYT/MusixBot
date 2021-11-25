@@ -17,7 +17,7 @@ async function Player(message , songname = [String]){
     .setTitle("Loading")
     .setAuthor("MusixPro" , "https://cutewallpaper.org/21/loading-gif-transparent-background/Download-Loading-Gif-Generator-Transparent-Background-PNG-.gif")
     .setDescription(funny())
-if(!message.content.startsWith("lfi!play")) return;
+
     message.channel.send({embeds: [em]}).then(funny =>{
 
     ytsr(songname).then(data =>{
