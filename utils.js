@@ -3,8 +3,10 @@ const voice = require("@discordjs/voice")
 const ytdl = require("ytdl-core")
 const funny = require("./random")
 const queue = new Map()
-const Discord =require("discord.js")
-
+const Discord = require("discord.js")
+const lyrics = require("solenolyrics")
+const config = require("./config.json")
+const map2 = new Map()
 
 //Main Player
 
@@ -14,9 +16,10 @@ async function Player(message , songname = [String]){
 // 
     const em = new Discord.MessageEmbed()
 
-    .setTitle("Loading")
+    .setTitle("Searching Please Wait")
     .setAuthor("MusixPro" , "https://cutewallpaper.org/21/loading-gif-transparent-background/Download-Loading-Gif-Generator-Transparent-Background-PNG-.gif")
     .setDescription(funny())
+    .setColor("WHITE")
 
     message.channel.send({embeds: [em]}).then(funny =>{
 
@@ -54,7 +57,6 @@ async function Player(message , songname = [String]){
             uploadedAt: info.uploadedAt,
             info: info
         }
-
         if(!serverQueue){
 
             const queueConstruct = {
@@ -100,12 +102,25 @@ message.channel.send({embeds: [embed]})
 
 
 function play(guild , song){
+    try{
     const serverQueue = queue.get(guild.id);
-    const resource = voice.createAudioResource(ytdl(song.url , {audioBitrate: 50000 , quality: "highestaudio"}).on("error" , () =>{
+    if(!song){
+        queue.delete(guild.id);
+    }
+    const resource = voice.createAudioResource(ytdl(song.url , {
+        filter: "audioonly" , quality: "highestaudio"
+    }).on("error" , () =>{
         serverQueue.voiceChannel.disconnect()
         serverQueue.textChannel.send("There are no Songs In The Queue To Play")
     })
     )
+    let final = map2.get(`${guild.id}_volume`)
+    if(final == null) final = 5
+   // resource.volume.setVolumeLogarithmic(final / 5)
+    serverQueue.player.on("volUpdate" , () =>{
+        resource.volume.setVolumeLogarithmic(map2.get(`${guild.id}_volume`) || 5 / 5)
+    })
+   //resource.encoder._read("-af apulsator=hz=0.08")
     serverQueue.player.play(resource)
     const embed = new Discord.MessageEmbed()
     .setTitle(song.title)
@@ -121,9 +136,15 @@ function play(guild , song){
     .setColor("WHITE")
     serverQueue.textChannel.send({embeds: [embed]})
     resource.playStream.on("end" , () =>{
+        serverQueue.player.on("loop" , () =>{
+            play2(guild ,  queue.get(guild.id).songs[0])
+        })
         serverQueue.songs.shift();
          play2(guild , queue.get(guild.id).songs[0])
     })
+}catch (e){
+    return;
+}
 }
 
 
@@ -131,15 +152,27 @@ function play(guild , song){
 
 
 async function play2(guild , song){
+    try{
     const serverQueue = queue.get(guild.id);
+    if(!song){
+        queue.delete(guild.id);
+    }
     if(song === null) serverQueue.voiceChannel.disconnect() && serverQueue.textChannel.send("There are no Songs In The Queue To Play");
-    const resource = voice.createAudioResource(ytdl(song.url , {audioBitrate: 50000 , quality: "highestaudio"}).on("error" , () =>{
+    const resource = voice.createAudioResource(ytdl(song.url ,{
+        filter: "audioonly" , quality: "highestaudio"
+    }).on("error" , () =>{
         serverQueue.voiceChannel.disconnect()
         serverQueue.textChannel.send("There are no Songs In The Queue To Play")
     })
     )
     serverQueue.resource = resource
-
+    let final = map2.get(`${guild.id}_volume`)
+    if(final == null) final = 5
+    // resource.encoder._read("-af apulsator=hz=0.08")
+    resource.volume.setVolumeLogarithmic(map2.get(`${guild.id}_volume`) || 5 / 5)
+    serverQueue.player.on("volUpdate" , () =>{
+        resource.volume.setVolumeLogarithmic(final / 5)
+    })
     if(serverQueue.songs !== null) serverQueue.voiceChannel.disconnect();
     serverQueue.player.play(resource)
     const embed = new Discord.MessageEmbed()
@@ -154,23 +187,29 @@ async function play2(guild , song){
     .setColor("WHITE")
     serverQueue.textChannel.send({embeds: [embed]})
     resource.playStream.on("end" , () =>{
+        serverQueue.player.on("loop" , () =>{
+            play(guild ,  queue.get(guild.id).songs[0])
+        })
         serverQueue.songs.shift();
          play(guild , queue.get(guild.id).songs[0])
     })
+}catch (e){
+    return;
+}
 }
 
 
 //skip 
 
 
-async function Skip(guild){
+async function Skip(guild , message){
     try{
     const serverQueue = queue.get(guild.id);
     if(!serverQueue.songs){
         serverQueue.textChannel.send({content: 'There are No Songs In queue!'})
     }
         serverQueue.songs.shift()
-        play(guild , queue.get(guild.id).songs[0])
+        play2(guild , queue.get(guild.id).songs[0])
     return;
 }catch(e){
     const embed1 = new Discord.MessageEmbed()
@@ -184,8 +223,28 @@ async function Skip(guild){
 //Now playing
 
 
-async function NP(guild){
+async function NP(guild , message){
+    try{
     const serverQueue = queue.get(guild.id);
+    const embed = new Discord.MessageEmbed()
+    .setTitle(serverQueue.songs.title)
+    .setURL(serverQueue.songs.url)
+    .setThumbnail(serverQueue.songs.thumbnail)
+    .addField("Duration" , serverQueue.songs.duration)
+    .addField("Duration" , serverQueue.songs.duration)
+    .addField("URL" , serverQueue.songs.url)
+    //.addField("Badges" , serverQueue.songs.badges || "No Badges")
+.addField("Channel" , `[${serverQueue.songs.info.author.name}](${serverQueue.songs.channelURL})`)
+.addField("Verfied" , serverQueue.songs.verfied || "false")
+.addField("Date Of Upload", serverQueue.songs.uploadedAt)
+    .setColor("WHITE")
+    serverQueue.textChannel.send({embeds: [embed]})
+    }catch (e){
+        const embed1 = new Discord.MessageEmbed()
+        .setTitle("No Songs Left")
+        .setColor("WHITE")
+       message.channel.send({embeds : [embed1]})
+    }
 }
 
 
@@ -221,7 +280,7 @@ async function Queue(guild ,message){
     console.log(Queue)
     const embed = new Discord.MessageEmbed()
     .setTitle("Queue For " + guild.name)
-    .setDescription(`Now Playing: 1) **${serverQueue.songs[0]}**\n\n\n` + Queue)
+    .setDescription(`Now Playing: 1) **${serverQueue.songs[0].title}**\n\n\n` + Queue)
     .setColor("WHITE")
     serverQueue.textChannel.send({embeds : [embed]})
 }catch(err){
@@ -241,6 +300,72 @@ async function ERRHandler(Input , message){
     message.channel.send(Input)
 }
 
+
+//PausePlay
+
+
+function Pause(guild , message){
+    try{
+    const serverQueue = queue.get(guild.id)
+
+    serverQueue.player.pause(true)
+    message.channel.send("Paused")
+    return serverQueue.player.pause()
+    }catch(err){
+        message.channel.send({content: "No Songs Playing"})
+    }
+}
+
+
+//Resume
+
+
+
+function Resume(guild , message){
+    try{
+    const serverQueue = queue.get(guild.id)
+    serverQueue.player.unpause(true)
+    message.channel.send("Resumed")
+    }catch(err){
+        message.channel.send({content: "No Songs Playing"})
+    }
+}
+
+
+async function Lyrics(guild, message){
+    try{
+    const serverQueue = queue.get(guild.id)
+lyrics.requestLyricsFor(serverQueue.songs[0].title).then(data =>{
+    const embed = new Discord.MessageEmbed()
+    .setColor("WHITE")
+    .setDescription(data)
+    .setTitle("Lyrics for " + serverQueue.songs[0].title)
+    message.channel.send({embeds : [embed]})
+}).catch(e =>{
+    console.log(e)
+    message.channel.send({content: "No Lyrics Found"})
+})
+    }catch(e){
+        message.channel.send({content: "No Songs Playing"})
+    }
+}
+
+
+//Volume
+
+
+async function Volume(vol , message){
+const volume = parseInt(vol)
+const serverQueue = queue.get(message.guild.id)
+if(amount < 1 || amount > 100){
+    return message.channel.send('you need to input a number between 1 and 100.');
+}
+map2.set(`${message.guild.id}_volume` , volume)
+serverQueue.player.emit('volUpdate')
+message.channel.send({content: `Volume Set To ${volume}`})
+}
+
+
 //Export Module
 
 
@@ -250,5 +375,9 @@ module.exports = {
     Queue,
     Disconnect,
     NP,
+    Pause,
+    Resume,
+    Lyrics,
+    Volume,
     ERRHandler
 }
